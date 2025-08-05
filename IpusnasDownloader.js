@@ -121,13 +121,9 @@ class IpusnasDownloader {
     return `${(bytes / Math.pow(1024, i)).toFixed(2)} ${sizes[i]}`;
   }
 
-  hashString(str) {
-    const hash = crypto.createHash("sha256").update(str).digest("hex");
-    return hash.slice(7, 23);
-  }
   decryptKey(userId, bookId, epustakaId, borrowKey) {
     const formatted = `${userId}${bookId}${epustakaId}`;
-    const key = this.hashString(formatted);
+    const key = crypto.createHash("sha256").update(formatted).digest("hex").slice(7, 23);
     const iv = Buffer.from(borrowKey, "base64").slice(0, 16);
     const ciphertext = Buffer.from(borrowKey, "base64").slice(16);
     const decipher = crypto.createDecipheriv("aes-128-cbc", key, iv);
