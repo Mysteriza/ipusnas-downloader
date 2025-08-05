@@ -50,16 +50,10 @@ node index.js --login <email> <password>
 
 ### 📘 Download a Book
 
-You can provide either the full book URL or just the book ID:
+You can download the book direct from your books shelf:
 
 ```bash
-node index.js <book-id>
-```
-
-Or:
-
-```bash
-node index.js https://ipusnas2.perpusnas.go.id/book/<book-id>/<extra>
+node index.js --list
 ```
 
 ---
@@ -77,15 +71,15 @@ Displays usage instructions and available commands.
 ## 📂 Output
 
 - Temporary and intermediate files are stored in the `temp/` directory.
-- Final decrypted PDF is saved in the current directory as:
-  **`<book-title>_decrypted.pdf`**
+- Final decrypted PDF is saved as:
+  **`books/<Safe_Title>/<Safe_Title>_decrypted.pdf`**
 
 ---
 
 ## ✨ Features
 
 - 🔐 Authenticated API access with token management
-- 📆 Handles `.mdrm` encrypted book packages
+- 🗖️ Handles `.mdrm` encrypted book packages
 - 🔓 Automatically decrypts PDFs using QPDF
 - 📉 Visual CLI progress bars during download
 - 🧹 Automatically removes encrypted and temporary files

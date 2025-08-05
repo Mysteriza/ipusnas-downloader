@@ -12,13 +12,7 @@ function showHelp() {
 
 Usage:
   node index.js --login <email> <password>    Log in and save token
-  node index.js <book_id>                     Download book by ID
-  node index.js <book_url>                    Download book from full Ipusnas URL
-
-Examples:
-  node index.js --login user@example.com secret123
-  node index.js 53aa0e2e-8092-4aac-884f-29d0961e22fa
-  node index.js https://ipusnas2.perpusnas.go.id/book/53aa0e2e-8092-4aac-884f-29d0961e22fa/...
+  node index.js --list                        Download the book direct from your books shelf
 
 Notes:
   - You must log in first before downloading any book.
@@ -54,26 +48,26 @@ if (args[0] === "--login") {
   return;
 }
 
-let bookId = args[0];
-const urlPattern = /\/book\/([a-f0-9\-]{36})\//;
-const match = bookId.match(urlPattern);
-if (match) {
-  bookId = match[1];
-}
-
-if (!/^[a-f0-9\-]{36}$/.test(bookId)) {
-  console.error("❌ Invalid book ID format.");
-  process.exit(1);
-}
-
-const book = new IpusnasDownloader(bookId);
-
-(async () => {
-  if (!fs.existsSync(tokenPath) || fs.readFileSync(tokenPath).length == 0) {
-    console.error("❌ Token file not found. Please log in first using:");
-    console.error("   node index.js --login <email> <password>");
+if (args[0] === "--list") {
+  if (!fs.existsSync(tokenPath)) {
+    console.error("❌ Token not found. Please login first.");
     process.exit(1);
   }
 
-  await book.run();
-})();
+  const {
+    data: { access_token },
+  } = JSON.parse(fs.readFileSync(tokenPath, "utf-8"));
+
+  const book = new IpusnasDownloader(null);
+  book.listBorrowedBooks(access_token).then(async (selectedBookId) => {
+    if (!selectedBookId) {
+      console.log("❌ No book selected.");
+      process.exit(1);
+    }
+
+    const selected = new IpusnasDownloader(selectedBookId);
+    await selected.run();
+  });
+
+  return;
+}

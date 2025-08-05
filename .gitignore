@@ -3,3 +3,4 @@ app.js
 temp/*
 token.json
 *.pdf
+books/*

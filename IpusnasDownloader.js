@@ -1,10 +1,11 @@
-const axios = require("axios");
-const crypto = require("crypto");
-const AdmZip = require("adm-zip");
-const fs = require("fs");
-const path = require("path");
-const { URL } = require("url");
 const cliProgress = require("cli-progress");
+const axios = require("axios");
+const AdmZip = require("adm-zip");
+const crypto = require("crypto");
+const path = require("path");
+const fs = require("fs");
+const inquirer = require("inquirer");
+const { URL } = require("url");
 const { execSync } = require("child_process");
 
 class IpusnasDownloader {
@@ -13,6 +14,7 @@ class IpusnasDownloader {
     this.apiLogin = `https://api2-ipusnas.perpusnas.go.id/api/auth/login`;
     this.apiBookDetail = `https://api2-ipusnas.perpusnas.go.id/api/webhook/book-detail?book_id=`;
     this.apiCheckBorrowBook = `https://api2-ipusnas.perpusnas.go.id/api/webhook/check-borrow-status?book_id=`;
+    this.apiListBorrowBook = `https://api2-ipusnas.perpusnas.go.id/api/webhook/book-borrow-shelf`;
 
     this.headers = {
       Origin: "https://ipusnas2.perpusnas.go.id",
@@ -22,6 +24,8 @@ class IpusnasDownloader {
     };
 
     this.tempDir = path.join(__dirname, "temp");
+    this.booksDir = path.join(__dirname, "books");
+    if (!fs.existsSync(this.booksDir)) fs.mkdirSync(this.booksDir);
     if (!fs.existsSync(this.tempDir)) fs.mkdirSync(this.tempDir);
   }
 
@@ -48,6 +52,47 @@ class IpusnasDownloader {
     }
   }
 
+  async listBorrowedBooks(token) {
+    try {
+      const { data } = await axios.get(this.apiListBorrowBook, {
+        headers: { Authorization: `Bearer ${token}`, ...this.headers },
+      });
+
+      const books = data.data;
+
+      if (!books || books.length === 0) {
+        console.log("📭 No borrowed books found.");
+        return null;
+      }
+
+      const choices = books.map((book, index) => {
+        const safeName = book.book_title.trim().replace(/[^a-z0-9_\-\.]/gi, "_");
+        const decryptedPath = path.join(__dirname, "books", safeName, `${safeName}_decrypted.pdf`);
+        const isDownloaded = fs.existsSync(decryptedPath);
+
+        return {
+          name: `${index + 1}. ${book.book_title} by ${book.book_author}${isDownloaded ? " - ✅ Downloaded" : ""}`,
+          value: book.book_id,
+          short: book.book_title,
+        };
+      });
+
+      const answer = await inquirer.prompt([
+        {
+          type: "list",
+          name: "selectedBookId",
+          message: "📚 Select a book to download:",
+          choices,
+        },
+      ]);
+
+      return answer.selectedBookId;
+    } catch (err) {
+      console.error("❌ Failed to fetch borrowed books:", err.message);
+      return null;
+    }
+  }
+
   async getBookDetail(token, bookId) {
     const { data } = await axios.get(this.apiBookDetail + bookId, {
       headers: { Authorization: `Bearer ${token}`, ...this.headers },
@@ -67,6 +112,11 @@ class IpusnasDownloader {
     const ext = path.extname(new URL(url).pathname) || ".pdf";
     const fileName = `${safeName}${ext}`;
     const inputPath = path.join(this.tempDir, fileName);
+
+    if (fs.existsSync(inputPath)) {
+      console.log(`📁 File already exists, skipping download: ${inputPath}`);
+      return inputPath;
+    }
 
     const response = await axios.get(url, {
       headers: { ...this.headers },
@@ -114,6 +164,7 @@ class IpusnasDownloader {
       });
     });
   }
+
   formatBytes(bytes) {
     if (bytes === 0) return "0 Bytes";
     const sizes = ["Bytes", "KB", "MB", "GB"];
@@ -193,6 +244,7 @@ class IpusnasDownloader {
       const {
         data: { access_token, id: user_id },
       } = JSON.parse(fs.readFileSync("token.json", "utf-8"));
+
       const {
         data: { id: book_id, book_title, using_drm, file_size_info, file_ext, book_author },
       } = await this.getBookDetail(access_token, this.bookId);
@@ -205,6 +257,15 @@ class IpusnasDownloader {
         },
       } = await this.getBorrowInfo(access_token, book_id);
 
+      const safeName = book_title.trim().replace(/[^a-z0-9_\-\.]/gi, "_");
+      const bookFolder = path.join(__dirname, "books", safeName);
+      const finalPath = path.join(bookFolder, `${safeName}_decrypted.pdf`);
+
+      if (fs.existsSync(finalPath)) {
+        console.log(`✅ Book already downloaded: ${finalPath}`);
+        return;
+      }
+
       console.log("📚 iPusnas Downloader");
       console.log(`📘 Book Title     : ${book_title}`);
       console.log(`✍️  Author         : ${book_author}`);
@@ -216,9 +277,10 @@ class IpusnasDownloader {
       const fileExt = path.extname(downloadedFile).toLowerCase();
 
       if (!using_drm) {
-        const finalPath = path.join(__dirname, path.basename(downloadedFile));
-        fs.renameSync(downloadedFile, finalPath);
-        console.log(`✅ File moved to: ${finalPath}`);
+        if (!fs.existsSync(bookFolder)) fs.mkdirSync(bookFolder, { recursive: true });
+        const destPath = path.join(bookFolder, path.basename(downloadedFile));
+        fs.renameSync(downloadedFile, destPath);
+        console.log(`✅ File moved to: ${destPath}`);
       } else {
         const decryptedKey = this.decryptKey(user_id, book_id, epustaka_id, borrow_key);
         const passwordZip = this.generatePasswordZip(decryptedKey, true);
@@ -231,9 +293,8 @@ class IpusnasDownloader {
           if (!extractedPDF) return;
           targetPDF = extractedPDF;
         }
-        const safeName = book_title.trim().replace(/[^a-z0-9_\-\.]/gi, "_");
-        const fileName = `${safeName}.pdf`;
-        const finalPath = path.join(__dirname, path.basename(fileName).replace(".pdf", "_decrypted.pdf"));
+
+        if (!fs.existsSync(bookFolder)) fs.mkdirSync(bookFolder, { recursive: true });
         await this.decryptPDF(targetPDF, pdfPassword, finalPath);
       }
     } catch (err) {
