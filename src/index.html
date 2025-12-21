@@ -58,7 +58,26 @@
         background-color: var(--bg);
         color: var(--text);
         min-height: 100vh;
-        overflow: hidden;
+        overflow-x: hidden;
+      }
+
+      .mobile-nav {
+        display: none;
+        background: var(--sidebar);
+        padding: 1rem;
+        border-bottom: 1px solid var(--border);
+        justify-content: space-between;
+        align-items: center;
+        position: sticky;
+        top: 0;
+        z-index: 100;
+      }
+      .menu-toggle {
+        background: transparent;
+        border: none;
+        color: var(--text);
+        font-size: 1.5rem;
+        cursor: pointer;
       }
 
       .app-layout {
@@ -409,6 +428,54 @@
       .hidden {
         display: none !important;
       }
+
+      /* Mobile Styles */
+      @media (max-width: 992px) {
+        aside {
+          position: fixed;
+          left: -260px;
+          top: 0;
+          bottom: 0;
+          z-index: 1000;
+          transition: var(--transition);
+        }
+        aside.active {
+          left: 0;
+          box-shadow: 10px 0 30px rgba(0, 0, 0, 0.5);
+        }
+        .aside-overlay {
+          display: none;
+          position: fixed;
+          inset: 0;
+          background: rgba(0, 0, 0, 0.5);
+          z-index: 999;
+          backdrop-filter: blur(4px);
+        }
+        .aside-overlay.active {
+          display: block;
+        }
+        .mobile-nav {
+          display: flex;
+        }
+        main {
+          padding: 1.5rem;
+        }
+        .header {
+          flex-direction: column;
+          gap: 1rem;
+          align-items: stretch;
+        }
+        .search-box {
+          width: 100%;
+        }
+        .btn-sync {
+          margin-left: 0;
+          width: 100%;
+        }
+        .grid {
+          grid-template-columns: 1fr;
+        }
+      }
     </style>
   </head>
   <body>
@@ -427,9 +494,21 @@
       </div>
     </div>
 
+    <!-- Mobile Top Bar -->
+    <div id="mobile-bar" class="mobile-nav hidden">
+      <div class="logo" style="margin-bottom: 0; padding-left: 0">
+        <div class="logo-box">i</div>
+        <h1 style="font-size: 1.1rem">iPusnas Dashboard</h1>
+      </div>
+      <button class="menu-toggle" onclick="toggleSidebar()">☰</button>
+    </div>
+
+    <!-- Sidebar Overlay -->
+    <div id="sidebar-overlay" class="aside-overlay" onclick="toggleSidebar()"></div>
+
     <!-- App Layout -->
     <div id="main-app" class="app-layout hidden">
-      <aside>
+      <aside id="main-sidebar">
         <div class="logo">
           <div class="logo-box">i</div>
           <h1>iPusnas <span style="font-weight: 300">Downloader</span></h1>
@@ -551,9 +630,18 @@
         }
       });
 
+      function toggleSidebar() {
+        const sidebar = document.getElementById("main-sidebar");
+        const overlay = document.getElementById("sidebar-overlay");
+        sidebar.classList.toggle("active");
+        overlay.classList.toggle("active");
+      }
+
+      // Update enterApp to show mobile bar
       function enterApp() {
         document.getElementById("auth-section").classList.add("hidden");
         document.getElementById("main-app").classList.remove("hidden");
+        document.getElementById("mobile-bar").classList.remove("hidden");
         loadAllData();
       }
 
@@ -826,6 +914,7 @@
         if (isLoggedIn) {
           document.getElementById("auth-section").classList.add("hidden");
           document.getElementById("main-app").classList.remove("hidden");
+          document.getElementById("mobile-bar").classList.remove("hidden");
           loadAllData(); // Then fetch everything
         }
       };
