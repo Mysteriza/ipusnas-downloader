@@ -4,3 +4,5 @@ temp/*
 token.json
 *.pdf
 books/*
+.agent/
+.venv
